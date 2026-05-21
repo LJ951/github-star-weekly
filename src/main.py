@@ -24,6 +24,7 @@ from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence
 
 LOGGER = logging.getLogger("github_star_weekly")
 DEFAULT_DATABASE_PATH = Path("data/rankings.sqlite")
+DEFAULT_TOP_N = 10
 
 
 class PipelineError(RuntimeError):
@@ -291,6 +292,34 @@ def config_value(config: Any, *names: str, default: Any = None) -> Any:
     return default
 
 
+def config_bool(config: Any, *names: str, default: bool = False) -> bool:
+    value = config_value(config, *names, default=default)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        normalized = value.strip().casefold()
+        if normalized in {"1", "true", "yes", "y", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "n", "off", ""}:
+            return False
+    return bool(value)
+
+
+def config_positive_int(config: Any, *names: str, default: int) -> int:
+    value = config_value(config, *names, default=default)
+    try:
+        number = int(value)
+    except (TypeError, ValueError) as exc:
+        joined = " or ".join(names)
+        raise PipelineError(f"{joined} must be a positive integer") from exc
+    if number <= 0:
+        joined = " or ".join(names)
+        raise PipelineError(f"{joined} must be a positive integer")
+    return number
+
+
 class DatabaseAdapter:
     def __init__(self, db_module: Any, db_path: Path, config: Any | None) -> None:
         self.db_module = db_module
@@ -483,6 +512,7 @@ def collect_top_repositories(week_start: date, week_end: date, config: Any | Non
     if callable(week_window):
         window = week_window(start=week_start, end=week_end)
 
+    limit = config_positive_int(config, "top_n", "TOP_N", default=DEFAULT_TOP_N)
     raw_items = call_with_supported_kwargs(
         collect,
         window=window,
@@ -490,7 +520,7 @@ def collect_top_repositories(week_start: date, week_end: date, config: Any | Non
         week_end=week_end,
         start_date=week_start,
         end_date=week_end,
-        limit=10,
+        limit=limit,
         config=config,
     )
     return normalize_repositories(raw_items)
@@ -672,11 +702,12 @@ def run_pipeline(args: argparse.Namespace) -> int:
 
     LOGGER.info("Preparing weekly report for %s through %s", week_start, week_end)
     config = load_optional_config()
+    dry_run = args.dry_run or config_bool(config, "dry_run", "DRY_RUN", default=False)
 
     with temporary_google_credentials():
         database = build_database(db_path, config)
         try:
-            if database.already_sent(week_start) and not args.force and not args.dry_run:
+            if database.already_sent(week_start) and not args.force and not dry_run:
                 LOGGER.info(
                     "Email for week_start=%s is already recorded as sent; use --force to resend",
                     week_start,
@@ -694,7 +725,7 @@ def run_pipeline(args: argparse.Namespace) -> int:
 
             html = render_email(repositories, week_start, week_end, config)
 
-            if args.dry_run:
+            if dry_run:
                 LOGGER.info("Dry run completed after rendering email; no email was sent")
                 return 0
 

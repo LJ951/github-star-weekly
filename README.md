@@ -52,7 +52,7 @@ pip install -r requirements.txt
 |---|---|---|
 | `APP_ENV` | `local` | 运行环境标识 |
 | `DATABASE_PATH` | `data/rankings.sqlite` | SQLite 数据库路径 |
-| `OPENAI_MODEL` | `gpt-4o-mini` | 摘要模型 |
+| `OPENAI_MODEL` | `gpt-5.5` | 摘要模型 |
 | `GITHUB_API_TIMEOUT_SECONDS` | `20` | GitHub API 超时 |
 | `OPENAI_TIMEOUT_SECONDS` | `45` | OpenAI API 超时 |
 | `RESEND_TIMEOUT_SECONDS` | `30` | Resend API 超时 |
@@ -99,10 +99,22 @@ Actions 中建议把 `GH_TOKEN` 映射为程序读取的 `GITHUB_TOKEN`。
 
 ## 运行方式
 
-完整流程由后续主流程模块提供:
+完整流程:
 
 ```bash
 python -m src.main
+```
+
+测试运行但不发送邮件:
+
+```bash
+python -m src.main --dry-run
+```
+
+也可以设置环境变量:
+
+```bash
+DRY_RUN=true python -m src.main
 ```
 
 配置模块可单独做本地校验:
@@ -117,11 +129,22 @@ python -m src.config
 
 ```text
 src/
+  main.py        # 串联完整流程
   config.py      # 读取和校验环境变量
+  collect.py     # 从 BigQuery 查询 GH Archive Top N
+  enrich.py      # 调 GitHub API 补充仓库信息
+  summarize.py   # 调 OpenAI 生成中文介绍，失败时 fallback
+  db.py          # SQLite 历史榜单和发送记录
+  render.py      # 渲染 HTML 邮件
+  emailer.py     # 调 Resend 发送邮件
+templates/
+  weekly_email.html
 data/
   .gitkeep       # 保留运行数据目录
+.github/
+  workflows/
+    weekly.yml
+tests/
 requirements.txt
 README.md
 ```
-
-其他模块由对应线程补充。

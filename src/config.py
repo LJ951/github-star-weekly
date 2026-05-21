@@ -16,7 +16,7 @@ except ImportError:  # pragma: no cover - useful before dependencies are install
 
 
 DEFAULT_DATABASE_PATH = Path("data/rankings.sqlite")
-DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
+DEFAULT_OPENAI_MODEL = "gpt-5.5"
 DEFAULT_GITHUB_API_TIMEOUT_SECONDS = 20
 DEFAULT_OPENAI_TIMEOUT_SECONDS = 45
 DEFAULT_RESEND_TIMEOUT_SECONDS = 30

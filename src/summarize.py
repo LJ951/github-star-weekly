@@ -10,7 +10,7 @@ from typing import Any, Mapping, Sequence
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.5")
 DEFAULT_TIMEOUT_SECONDS = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "30"))
 README_LIMIT = 6000
 SUMMARY_MIN_CHARS = 40
