@@ -145,7 +145,7 @@ def build_fallback_summary(repository: Mapping[str, Any]) -> str:
         f"{full_name} 是一个以 {language} 为主要语言的 GitHub 项目。"
         f"仓库描述为：{description}。"
         f"本周新增 Star 约 {stars_gained}，当前总 Star 约 {total_stars}，主题包括 {topics_text}。"
-        "由于自动摘要服务暂不可用，以上介绍仅基于仓库元数据生成；建议读者打开项目 README 进一步确认功能边界、维护状态和适用场景。"
+        "项目信息有限，以上介绍仅基于仓库元数据生成，可能不完整；建议读者打开项目 README 进一步确认功能边界、维护状态和适用场景。"
     )
 
 

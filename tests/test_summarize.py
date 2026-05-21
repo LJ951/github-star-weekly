@@ -46,6 +46,7 @@ class SummarizeTests(unittest.TestCase):
         self.assertIn("owner/sparse", summary)
         self.assertIn("项目信息有限", summary)
         self.assertIn("未标明主要语言", summary)
+        self.assertNotIn("自动摘要服务暂不可用", summary)
 
 
 if __name__ == "__main__":
