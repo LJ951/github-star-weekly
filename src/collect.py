@@ -11,7 +11,7 @@ LOGGER = logging.getLogger(__name__)
 
 DEFAULT_LIMIT = 10
 MAX_QUERY_DAYS = 7
-GH_ARCHIVE_TABLE = "githubarchive.day.*"
+GH_ARCHIVE_TABLE_PREFIX = "githubarchive.day"
 
 
 class BigQueryClient(Protocol):
@@ -39,6 +39,13 @@ class WeekWindow:
     @property
     def day_count(self) -> int:
         return (self.end - self.start).days + 1
+
+    @property
+    def suffixes(self) -> list[str]:
+        return [
+            (self.start + timedelta(days=offset)).strftime("%Y%m%d")
+            for offset in range(self.day_count)
+        ]
 
 
 @dataclass(frozen=True)
@@ -85,18 +92,34 @@ def validate_week_window(window: WeekWindow) -> None:
         )
 
 
-def build_weekly_top_repos_sql(table: str = GH_ARCHIVE_TABLE) -> str:
-    """Build the parameterized GH Archive query."""
+def build_weekly_top_repos_sql(
+    window: WeekWindow | None = None,
+    *,
+    table_prefix: str = GH_ARCHIVE_TABLE_PREFIX,
+) -> str:
+    """Build the GH Archive query from explicit day tables.
+
+    GH Archive exposes helper views such as ``githubarchive.day.yesterday``.
+    Querying ``githubarchive.day.*`` can accidentally include those views, and
+    BigQuery rejects wildcard queries that touch views. Listing the seven day
+    tables directly keeps the scan bounded and avoids that view-prefix trap.
+    """
+
+    query_window = window or previous_complete_utc_week()
+    validate_week_window(query_window)
+    unioned_days = "\nUNION ALL\n".join(
+        f"SELECT repo.name AS full_name FROM `{table_prefix}.{suffix}` WHERE type = 'WatchEvent'"
+        for suffix in query_window.suffixes
+    )
 
     return f"""
 SELECT
-  repo.name AS full_name,
+  full_name,
   COUNT(*) AS stars_gained
-FROM `{table}`
-WHERE
-  _TABLE_SUFFIX BETWEEN @start_suffix AND @end_suffix
-  AND type = 'WatchEvent'
-  AND repo.name IS NOT NULL
+FROM (
+  {unioned_days}
+)
+WHERE full_name IS NOT NULL
 GROUP BY full_name
 ORDER BY stars_gained DESC, full_name ASC
 LIMIT @limit
@@ -131,12 +154,8 @@ def collect_weekly_top_repos(
 
     try:
         bigquery = _load_bigquery_module()
-        query = build_weekly_top_repos_sql()
+        query = build_weekly_top_repos_sql(query_window)
         query_parameters = [
-            bigquery.ScalarQueryParameter(
-                "start_suffix", "STRING", query_window.start_suffix
-            ),
-            bigquery.ScalarQueryParameter("end_suffix", "STRING", query_window.end_suffix),
             bigquery.ScalarQueryParameter("limit", "INT64", limit),
         ]
 

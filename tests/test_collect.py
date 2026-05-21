@@ -68,6 +68,18 @@ class CollectTests(unittest.TestCase):
         self.assertEqual(window.end, date(2026, 5, 17))
         self.assertEqual(window.start_suffix, "20260511")
         self.assertEqual(window.end_suffix, "20260517")
+        self.assertEqual(
+            window.suffixes,
+            [
+                "20260511",
+                "20260512",
+                "20260513",
+                "20260514",
+                "20260515",
+                "20260516",
+                "20260517",
+            ],
+        )
 
     def test_validate_week_window_rejects_more_than_seven_days(self) -> None:
         with self.assertRaises(ValueError):
@@ -75,13 +87,17 @@ class CollectTests(unittest.TestCase):
                 collect.WeekWindow(start=date(2026, 5, 1), end=date(2026, 5, 8))
             )
 
-    def test_sql_uses_parameters_for_date_suffix_and_limit(self) -> None:
-        sql = collect.build_weekly_top_repos_sql()
+    def test_sql_uses_explicit_day_tables_and_parameterized_limit(self) -> None:
+        sql = collect.build_weekly_top_repos_sql(
+            collect.WeekWindow(start=date(2026, 5, 11), end=date(2026, 5, 17))
+        )
 
-        self.assertIn("@start_suffix", sql)
-        self.assertIn("@end_suffix", sql)
         self.assertIn("@limit", sql)
         self.assertIn("type = 'WatchEvent'", sql)
+        self.assertIn("githubarchive.day.20260511", sql)
+        self.assertIn("githubarchive.day.20260517", sql)
+        self.assertNotIn("githubarchive.day.*", sql)
+        self.assertEqual(sql.count("UNION ALL"), 6)
 
     def test_collect_runs_dry_run_and_parameterized_query(self) -> None:
         fake_bigquery = SimpleNamespace(
@@ -110,10 +126,7 @@ class CollectTests(unittest.TestCase):
         self.assertEqual(len(client.calls), 2)
         self.assertTrue(client.calls[0].job_config.dry_run)
         params = {param.name: param.value for param in client.calls[1].job_config.query_parameters}
-        self.assertEqual(
-            params,
-            {"start_suffix": "20260511", "end_suffix": "20260517", "limit": 2},
-        )
+        self.assertEqual(params, {"limit": 2})
 
     def test_main_compatible_entrypoint_accepts_week_start_and_config(self) -> None:
         fake_bigquery = SimpleNamespace(
