@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from src.summarize import build_fallback_summary, summarize_repository
 
@@ -21,6 +22,23 @@ class SummarizeTests(unittest.TestCase):
         self.assertIn("Python", result.summary_zh)
         self.assertIn("123", result.summary_zh)
         self.assertIn("4,567", result.summary_zh)
+
+    def test_deepseek_env_key_is_used(self):
+        repository = {
+            "full_name": "owner/repo",
+            "description": "A practical automation tool",
+            "language": "Python",
+        }
+
+        with patch.dict("os.environ", {"DEEPSEEK_API_KEY": "deepseek-secret"}, clear=False), \
+            patch("src.summarize._call_openai", return_value="这是一个足够长的 DeepSeek 中文摘要，用于验证接口配置被正确读取。") as call:
+            result = summarize_repository(repository)
+
+        self.assertFalse(result.used_fallback)
+        self.assertIn("DeepSeek", result.summary_zh)
+        self.assertEqual(call.call_args.kwargs["api_key"], "deepseek-secret")
+        self.assertEqual(call.call_args.kwargs["base_url"], "https://api.deepseek.com")
+        self.assertEqual(call.call_args.kwargs["model"], "deepseek-v4-flash")
 
     def test_fallback_handles_sparse_repository_fields(self):
         summary = build_fallback_summary({"full_name": "owner/sparse"})

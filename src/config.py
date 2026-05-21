@@ -16,7 +16,8 @@ except ImportError:  # pragma: no cover - useful before dependencies are install
 
 
 DEFAULT_DATABASE_PATH = Path("data/rankings.sqlite")
-DEFAULT_OPENAI_MODEL = "gpt-5.5"
+DEFAULT_AI_BASE_URL = "https://api.deepseek.com"
+DEFAULT_AI_MODEL = "deepseek-v4-flash"
 DEFAULT_GITHUB_API_TIMEOUT_SECONDS = 20
 DEFAULT_OPENAI_TIMEOUT_SECONDS = 45
 DEFAULT_RESEND_TIMEOUT_SECONDS = 30
@@ -34,6 +35,9 @@ class AppConfig:
     database_path: Path
     google_credentials_json: str | None
     google_credentials_path: Path | None
+    ai_api_key: str
+    ai_base_url: str | None
+    ai_model: str
     github_token: str
     openai_api_key: str
     resend_api_key: str
@@ -67,7 +71,8 @@ class AppConfig:
             ),
             "email_from": self.email_from,
             "email_to": [_mask_email(address) for address in self.email_to],
-            "openai_model": self.openai_model,
+            "ai_base_url": self.ai_base_url or "default",
+            "ai_model": self.ai_model,
             "github_api_timeout_seconds": self.github_api_timeout_seconds,
             "openai_timeout_seconds": self.openai_timeout_seconds,
             "resend_timeout_seconds": self.resend_timeout_seconds,
@@ -147,7 +152,13 @@ def load_config(
         )
 
     github_token = _required_str(source, "GITHUB_TOKEN", missing)
-    openai_api_key = _required_str(source, "OPENAI_API_KEY", missing)
+    ai_api_key = (
+        _optional_str(source, "AI_API_KEY")
+        or _optional_str(source, "DEEPSEEK_API_KEY")
+        or _optional_str(source, "OPENAI_API_KEY")
+    )
+    if ai_api_key is None:
+        missing.append("AI_API_KEY or DEEPSEEK_API_KEY or OPENAI_API_KEY")
     resend_api_key = _required_str(source, "RESEND_API_KEY", missing)
     email_from = _required_str(source, "EMAIL_FROM", missing)
     email_to_raw = _required_str(source, "EMAIL_TO", missing)
@@ -167,6 +178,14 @@ def load_config(
 
     email_to = _parse_email_list(email_to_raw, "EMAIL_TO")
 
+    ai_base_url = _optional_str(source, "AI_BASE_URL") or DEFAULT_AI_BASE_URL
+    ai_model = (
+        _optional_str(source, "AI_MODEL")
+        or _optional_str(source, "DEEPSEEK_MODEL")
+        or _optional_str(source, "OPENAI_MODEL")
+        or DEFAULT_AI_MODEL
+    )
+
     return AppConfig(
         app_env=_optional_str(source, "APP_ENV") or "local",
         database_path=Path(
@@ -174,12 +193,15 @@ def load_config(
         ),
         google_credentials_json=google_credentials_json,
         google_credentials_path=google_credentials_path,
+        ai_api_key=ai_api_key or "",
+        ai_base_url=ai_base_url,
+        ai_model=ai_model,
         github_token=github_token,
-        openai_api_key=openai_api_key,
+        openai_api_key=ai_api_key or "",
         resend_api_key=resend_api_key,
         email_from=email_from,
         email_to=email_to,
-        openai_model=_optional_str(source, "OPENAI_MODEL") or DEFAULT_OPENAI_MODEL,
+        openai_model=ai_model,
         github_api_timeout_seconds=_positive_float(
             source,
             "GITHUB_API_TIMEOUT_SECONDS",

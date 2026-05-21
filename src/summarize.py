@@ -10,7 +10,13 @@ from typing import Any, Mapping, Sequence
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.5")
+DEFAULT_BASE_URL = os.getenv("AI_BASE_URL", "https://api.deepseek.com")
+DEFAULT_MODEL = (
+    os.getenv("AI_MODEL")
+    or os.getenv("DEEPSEEK_MODEL")
+    or os.getenv("OPENAI_MODEL")
+    or "deepseek-v4-flash"
+)
 DEFAULT_TIMEOUT_SECONDS = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "30"))
 README_LIMIT = 6000
 SUMMARY_MIN_CHARS = 40
@@ -31,6 +37,7 @@ def summarize_repositories(
     repositories: Sequence[Mapping[str, Any]],
     *,
     api_key: str | None = None,
+    base_url: str | None = None,
     model: str | None = None,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     config: Any | None = None,
@@ -47,8 +54,15 @@ def summarize_repositories(
             **dict(repository),
             "summary_zh": summarize_repository(
                 repository,
-                api_key=api_key or _config_value(config, "openai_api_key"),
-                model=model or _config_value(config, "openai_model"),
+                api_key=api_key
+                or _config_value(config, "ai_api_key")
+                or _config_value(config, "openai_api_key"),
+                base_url=base_url
+                or _config_value(config, "ai_base_url")
+                or _config_value(config, "openai_base_url"),
+                model=model
+                or _config_value(config, "ai_model")
+                or _config_value(config, "openai_model"),
                 timeout_seconds=float(
                     _config_value(config, "openai_timeout_seconds", default=timeout_seconds)
                 ),
@@ -62,6 +76,7 @@ def summarize_repository(
     repository: Mapping[str, Any],
     *,
     api_key: str | None = None,
+    base_url: str | None = None,
     model: str | None = None,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     config: Any | None = None,
@@ -73,23 +88,45 @@ def summarize_repository(
     """
 
     full_name = _clean_text(repository.get("full_name")) or "未知项目"
-    resolved_api_key = api_key or _config_value(config, "openai_api_key") or os.getenv("OPENAI_API_KEY")
-    resolved_model = model or _config_value(config, "openai_model") or DEFAULT_MODEL
+    resolved_api_key = (
+        api_key
+        or _config_value(config, "ai_api_key")
+        or _config_value(config, "openai_api_key")
+        or os.getenv("AI_API_KEY")
+        or os.getenv("DEEPSEEK_API_KEY")
+        or os.getenv("OPENAI_API_KEY")
+    )
+    resolved_base_url = (
+        base_url
+        or _config_value(config, "ai_base_url")
+        or _config_value(config, "openai_base_url")
+        or os.getenv("AI_BASE_URL")
+        or DEFAULT_BASE_URL
+    )
+    resolved_model = (
+        model
+        or _config_value(config, "ai_model")
+        or _config_value(config, "openai_model")
+        or os.getenv("AI_MODEL")
+        or os.getenv("DEEPSEEK_MODEL")
+        or DEFAULT_MODEL
+    )
     resolved_timeout = float(_config_value(config, "openai_timeout_seconds", default=timeout_seconds))
 
     if not resolved_api_key:
-        return SummaryResult(full_name, build_fallback_summary(repository), True, "missing OpenAI API key")
+        return SummaryResult(full_name, build_fallback_summary(repository), True, "missing AI API key")
 
     try:
         summary = _call_openai(
             repository,
             api_key=resolved_api_key,
+            base_url=resolved_base_url,
             model=resolved_model,
             timeout_seconds=resolved_timeout,
         )
         return SummaryResult(full_name, summary, False)
     except Exception as exc:  # noqa: BLE001 - external SDKs raise many exception types.
-        LOGGER.warning("OpenAI summary failed for %s: %s", full_name, exc)
+        LOGGER.warning("AI summary failed for %s: %s", full_name, exc)
         return SummaryResult(full_name, build_fallback_summary(repository), True, str(exc))
 
 
@@ -116,6 +153,7 @@ def _call_openai(
     repository: Mapping[str, Any],
     *,
     api_key: str,
+    base_url: str | None,
     model: str,
     timeout_seconds: float,
 ) -> str:
@@ -124,7 +162,10 @@ def _call_openai(
     except ImportError as exc:
         raise RuntimeError("openai package is not installed") from exc
 
-    client = OpenAI(api_key=api_key, timeout=timeout_seconds)
+    client_kwargs = {"api_key": api_key, "timeout": timeout_seconds}
+    if base_url:
+        client_kwargs["base_url"] = base_url
+    client = OpenAI(**client_kwargs)
     prompt = _build_prompt(repository)
 
     response = client.chat.completions.create(

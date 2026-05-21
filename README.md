@@ -8,7 +8,7 @@
 
 - 统计上一个完整 UTC 自然周的 GitHub 新增 Star Top 10。
 - 使用 GitHub API 补充仓库详情。
-- 使用 OpenAI 生成中文项目介绍，并保留失败 fallback。
+- 使用 DeepSeek/OpenAI 兼容 API 生成中文项目介绍，并保留失败 fallback。
 - 使用 SQLite 保存历史榜单和发送记录。
 - 使用 Resend 发送 HTML 邮件。
 - 使用 GitHub Actions 每周一中国时间 09:00 自动运行。
@@ -41,7 +41,7 @@ pip install -r requirements.txt
 |---|---|
 | `GOOGLE_APPLICATION_CREDENTIALS_JSON` 或 `GOOGLE_APPLICATION_CREDENTIALS` | BigQuery Service Account JSON 全文，或凭证 JSON 文件路径 |
 | `GITHUB_TOKEN` | 读取公开仓库详情，降低 GitHub API 限流风险 |
-| `OPENAI_API_KEY` | 生成中文项目介绍 |
+| `DEEPSEEK_API_KEY` 或 `AI_API_KEY` 或 `OPENAI_API_KEY` | 生成中文项目介绍 |
 | `RESEND_API_KEY` | 发送邮件 |
 | `EMAIL_FROM` | 发件邮箱 |
 | `EMAIL_TO` | 收件邮箱，多个地址用英文逗号分隔 |
@@ -52,7 +52,9 @@ pip install -r requirements.txt
 |---|---|---|
 | `APP_ENV` | `local` | 运行环境标识 |
 | `DATABASE_PATH` | `data/rankings.sqlite` | SQLite 数据库路径 |
-| `OPENAI_MODEL` | `gpt-5.5` | 摘要模型 |
+| `AI_BASE_URL` | `https://api.deepseek.com` | OpenAI 兼容 API 地址 |
+| `AI_MODEL` | `deepseek-v4-flash` | 摘要模型 |
+| `OPENAI_MODEL` | 空 | 兼容旧配置，优先使用 `AI_MODEL` |
 | `GITHUB_API_TIMEOUT_SECONDS` | `20` | GitHub API 超时 |
 | `OPENAI_TIMEOUT_SECONDS` | `45` | OpenAI API 超时 |
 | `RESEND_TIMEOUT_SECONDS` | `30` | Resend API 超时 |
@@ -66,7 +68,7 @@ pip install -r requirements.txt
 ```text
 GOOGLE_APPLICATION_CREDENTIALS_JSON={...}
 GITHUB_TOKEN=...
-OPENAI_API_KEY=...
+DEEPSEEK_API_KEY=...
 RESEND_API_KEY=...
 EMAIL_FROM=weekly@example.com
 EMAIL_TO=you@example.com
@@ -80,7 +82,7 @@ EMAIL_TO=you@example.com
 |---|---|
 | `GOOGLE_APPLICATION_CREDENTIALS_JSON` | Google Service Account JSON 全文 |
 | `GH_TOKEN` | GitHub API Token |
-| `OPENAI_API_KEY` | OpenAI API Key |
+| `DEEPSEEK_API_KEY` | DeepSeek API Key |
 | `RESEND_API_KEY` | Resend API Key |
 | `EMAIL_FROM` | 发件邮箱 |
 | `EMAIL_TO` | 收件邮箱 |
@@ -133,7 +135,7 @@ src/
   config.py      # 读取和校验环境变量
   collect.py     # 从 BigQuery 查询 GH Archive Top N
   enrich.py      # 调 GitHub API 补充仓库信息
-  summarize.py   # 调 OpenAI 生成中文介绍，失败时 fallback
+  summarize.py   # 调 DeepSeek/OpenAI 兼容 API 生成中文介绍，失败时 fallback
   db.py          # SQLite 历史榜单和发送记录
   render.py      # 渲染 HTML 邮件
   emailer.py     # 调 Resend 发送邮件
