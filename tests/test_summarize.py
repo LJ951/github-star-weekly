@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from src.summarize import build_fallback_summary, summarize_repository
+from src.summarize import _clean_summary, build_fallback_summary, summarize_repository
 
 
 class SummarizeTests(unittest.TestCase):
@@ -47,6 +47,9 @@ class SummarizeTests(unittest.TestCase):
         self.assertIn("项目信息有限", summary)
         self.assertIn("未标明主要语言", summary)
         self.assertNotIn("自动摘要服务暂不可用", summary)
+
+    def test_short_non_empty_model_summary_is_accepted(self):
+        self.assertEqual(_clean_summary("项目信息有限。"), "项目信息有限。")
 
 
 if __name__ == "__main__":

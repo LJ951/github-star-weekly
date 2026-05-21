@@ -19,7 +19,6 @@ DEFAULT_MODEL = (
 )
 DEFAULT_TIMEOUT_SECONDS = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "30"))
 README_LIMIT = 6000
-SUMMARY_MIN_CHARS = 40
 SUMMARY_MAX_CHARS = 500
 
 
@@ -187,7 +186,7 @@ def _call_openai(
     content = response.choices[0].message.content if response.choices else None
     summary = _clean_summary(content)
     if not summary:
-        raise RuntimeError("OpenAI returned an empty summary")
+        raise RuntimeError("AI provider returned an empty summary")
     return summary
 
 
@@ -226,8 +225,6 @@ def _clean_summary(content: str | None) -> str:
     summary = re.sub(r"\s+", " ", summary).strip()
     if len(summary) > SUMMARY_MAX_CHARS:
         summary = summary[:SUMMARY_MAX_CHARS].rstrip() + "..."
-    if len(summary) < SUMMARY_MIN_CHARS:
-        return ""
     return summary
 
 
